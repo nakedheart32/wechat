@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.abc.wechat.dao.db2.ContactsMapper" >
+
+    <resultMap id="contactsMap" type="com.abc.wechat.entity.Contact" >
+        <id column="UserName" property="id" jdbcType="LONGVARCHAR" />
+        <result column="Remark" property="remark" jdbcType="LONGVARCHAR" />
+        <result column="NickName" property="nickName" jdbcType="LONGVARCHAR" />
+        <result column="ChatRoomType" property="isChatRoom" jdbcType="LONGVARCHAR" />
+    </resultMap>
+
+
+    <sql id="contactsColumns" >
+        `UserName`, `Remark`, `NickName`, `ChatRoomType`
+    </sql>
+
+
+    <select id="selectAllContacts" resultMap="contactsMap"  >
+        SELECT
+        <include refid="contactsColumns" />
+        FROM `Contact`
+    </select>
+
+    <select id="selectNameById" resultType="java.lang.String" >
+        SELECT `NickName`
+        FROM `Contact`
+        WHERE `UserName` = #{"UserName"}
+    </select>
+
+</mapper>

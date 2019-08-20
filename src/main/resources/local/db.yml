@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    hikari:
+      db1:
+        driver-class-name: org.sqlite.JDBC
+        username:
+        password:
+        # chatting records
+        jdbc-url: jdbc:sqlite:F:\\ollyDB\\deWeChat\\decodeWeChat\\x64\\Debug\\2nd\\dec_MSG0.db
+        type: com.alibaba.druid.pool.DruidDataSource
+
+      db2:
+        driver-class-name: org.sqlite.JDBC
+        username:
+        password:
+        # contacts
+        jdbc-url: jdbc:sqlite:F:\\ollyDB\\deWeChat\\decodeWeChat\\x64\\Debug\\2nd\\dec_MicroMsg.db
+        type: com.alibaba.druid.pool.DruidDataSource
