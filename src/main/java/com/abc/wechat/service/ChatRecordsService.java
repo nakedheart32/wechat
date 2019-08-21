@@ -7,9 +7,11 @@ import com.abc.wechat.entity.ChatMsg;
 import java.util.List;
 
 public interface ChatRecordsService {
-    public List<ChatMsg> selectAllChatRecords();
-    public List<Msg> selectAllMsgs();
-    public List<ChatMsg> selectRecords();
-    public List<Msg> selectMsgs();
+
+    public List<ChatMsg> selectChatMsg();
+    public List<Msg> selectTestMsg();
     public List<Message> selectMessages();
+
+    int upload();
+
 }
