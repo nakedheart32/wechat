@@ -14,4 +14,5 @@ public interface ChatRecordsMapper {
     @Update("update `MSG` set `Reserved0` = #{random} where localId = 1")
     @Options(useCache = false)
     void testCache(int random);
+
 }

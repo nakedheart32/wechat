@@ -3,6 +3,7 @@ package com.abc.wechat.utils;
 import com.abc.wechat.dao.db2.ContactsMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.regex.Matcher;
@@ -10,7 +11,7 @@ import java.util.regex.Pattern;
 
 public class StrUtils {
 
-    public static final String GSTIME="yyyy-MM-dd HH:mm:ss";
+    public static final String GSTIME="yyyy-MM-dd";
     public static final String CHATROOM_PATTERN = "\\d+@chatroom";
 
     public static final String ID_PATTERN = "[a-zA-Z0-9_]+";
@@ -23,9 +24,16 @@ public class StrUtils {
 
 
     //时间戳转换
-    public static String createTime(String createTime){
+    public static Date createTime(String createTime){
         SimpleDateFormat format = new SimpleDateFormat(GSTIME);
-        return  format.format(new Date(Long.parseLong(createTime)*1000));
+        String date = format.format(new Date(Long.parseLong(createTime)*1000));
+        Date recv_time = new Date();
+        try {
+            recv_time = new SimpleDateFormat(GSTIME).parse(date);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return recv_time;
     }
 
     //判断消息是否群聊
