@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -166,4 +167,62 @@ public class MsgDao {
 
         return messageList;
     }
+
+    public int saveMessage(Message message){
+        Connection connection = dbUtil.DeltaTimeConnection();
+        int rows = 0;
+        String sql = "INSERT INTO `reupload` VALUES(?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setString(1, message.getId().toString());
+            preparedStatement.setString(2, message.getUid());
+            preparedStatement.setString(3, message.getRid().toString());
+            preparedStatement.setString(4, message.getSend_username());
+            preparedStatement.setString(5, message.getSend_user());
+            preparedStatement.setString(6,message.getGname());
+            preparedStatement.setString(7, message.getGid());
+            preparedStatement.setLong (8, message.getRecv_timestamp());
+            preparedStatement.setString(9, message.getDetail());
+            preparedStatement.setString(10, message.getType());
+            preparedStatement.setDate(11, (Date) message.getRecv_time());
+            preparedStatement.setString(12, message.getHeadImgUlr());
+            rows = preparedStatement.executeUpdate(sql);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return rows;
+
+    }
+
+    //查標誌位為0的reupload庫
+    public List<Message> selectReuploadMessages() {
+        Connection connection = dbUtil.DeltaTimeConnection();
+        List<Message> messageList = new ArrayList<>();
+        try {
+            Statement statement = connection.createStatement();
+            String sql = "SELECT * FROM `reupload` WHERE `flag` = '0' ";
+            ResultSet resultSet = statement.executeQuery(sql);
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd ");
+            while (resultSet.next()){
+                Message message = new Message();
+                message.setHeadImgUlr(resultSet.getString("headImgUlr"));
+                message.setUid(resultSet.getString("uid"));
+                message.setSend_username(resultSet.getString("send_username"));
+                message.setSend_user(resultSet.getString("send_user"));
+                message.setGid(resultSet.getString("gid"));
+                message.setGname(resultSet.getString("gname"));
+                message.setType(resultSet.getString("type"));
+                message.setDetail(resultSet.getString("detail"));
+                message.setRecv_time(dateFormat.parse(resultSet.getString("recv_time")));
+                message.setRecv_timestamp(resultSet.getLong("recv_timestamp"));
+                message.setId(UUID.fromString(resultSet.getString("id")) );
+                message.setRid(UUID.fromString(resultSet.getString("rid")));
+                messageList.add(message);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return messageList;
+    }
+
 }

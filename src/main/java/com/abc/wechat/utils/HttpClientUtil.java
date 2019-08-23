@@ -127,9 +127,7 @@ public class HttpClientUtil {
             httpPost.setEntity(entity);
             // 执行http请求
             response = httpClient.execute(httpPost);
-            System.out.print(response.getStatusLine().getStatusCode() + " ");
             resultString = EntityUtils.toString(response.getEntity(), "utf-8");
-            System.out.println(resultString);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {

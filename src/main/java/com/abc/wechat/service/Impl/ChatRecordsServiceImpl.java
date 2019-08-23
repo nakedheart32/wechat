@@ -5,11 +5,9 @@ import com.abc.wechat.dao.db2.ContactsMapper;
 import com.abc.wechat.dto.Message;
 import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
-import com.abc.wechat.jdbc.DeltaTimeDao;
 import com.abc.wechat.jdbc.MsgDao;
 import com.abc.wechat.service.ChatRecordsService;
 import com.abc.wechat.utils.HttpClientUtil;
-import com.abc.wechat.utils.StrUtils;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -17,10 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ChatRecordsServiceImpl implements ChatRecordsService {
@@ -60,18 +56,47 @@ public class ChatRecordsServiceImpl implements ChatRecordsService {
      * @return 存入新消息的数目
      */
     @Override
-    public int upload() {
+    public List<Integer> upload() {
         List<Message> messageList = selectMessages();
-        if(null == messageList || messageList.size() == 0) return 0;
-        for(Message message : messageList){
-            JSONObject jsonToPost = new JSONObject();
-            JSONArray jsonArray = new JSONArray();
-            JSONObject messageJson = (JSONObject) JSON.toJSON(message);
-            jsonArray.add(messageJson);
-            jsonToPost.put("data", jsonArray);
-            jsonToPost.put("type", 1);
-            HttpClientUtil.doPostJson(url, jsonToPost.toString());
-        }
-        return messageList.size();
+        List<Integer> res = new ArrayList<>();
+        res.add(0);res.add(0);
+        if(null == messageList || messageList.size() == 0) return res;
+        int cnt = 0;
+        for(Message message : messageList)
+            if(doPost(message)) ++cnt;
+        res.set(0, cnt);
+        res.set(1, messageList.size() - cnt);
+        return res;
     }
+
+    //从备份库查，dopost
+   /* public List<Integer> reupload(){
+        List<Message> messageList = selectReuploadMessages();
+    }
+
+    private List<Message> selectReuploadMessages() {
+        return msgDao.selectReuploadMessages();
+    }*/
+
+    
+
+
+
+
+
+
+    private boolean doPost(Message message){
+        JSONObject jsonToPost = new JSONObject();
+        JSONArray jsonArray = new JSONArray();
+        JSONObject messageJson = (JSONObject) JSON.toJSON(message);
+        jsonArray.add(messageJson);
+        jsonToPost.put("data", jsonArray);
+        jsonToPost.put("type", 1);
+
+        String resultStr = HttpClientUtil.doPostJson(url, jsonToPost.toString());
+        JSONObject resJson = JSON.parseObject(resultStr);
+        if(0 == (int)resJson.get("code") ) return true;
+        return false;
+    }
+
 }

@@ -12,6 +12,6 @@ public interface ChatRecordsService {
     public List<Msg> selectTestMsg();
     public List<Message> selectMessages();
 
-    int upload();
+    List<Integer> upload();
 
 }

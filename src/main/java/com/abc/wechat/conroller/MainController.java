@@ -10,10 +10,12 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 @RestController
@@ -30,9 +32,10 @@ public class MainController {
 
     //上传新增聊天记录
     @GetMapping("/upload")
+    @Scheduled(cron = "30 30 * * * *")
     public ResultMsg ResultMsg(){
-        int newMsgNums =  chatRecordsService.upload();
-        return responseResultMsg(200, "success", newMsgNums + " new text messages uploaded");
+        List<Integer> newMsgNums =  chatRecordsService.upload();
+        return responseResultMsg(200, "success", newMsgNums.get(0) + " new text messages uploaded");
     }
 
     //查看新增聊天记录
@@ -58,6 +61,15 @@ public class MainController {
         resultMsg.setMsg(msg);
         resultMsg.setData(data);
         return resultMsg;
+    }
+
+    @GetMapping("/time")
+    //@Scheduled(cron = "30 * * * * *")
+    public String testSchedule(){
+        SimpleDateFormat dateformat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String dateStr = dateformat.format(System.currentTimeMillis());
+        System.out.println(dateStr);
+        return "OK";
     }
 
 }
