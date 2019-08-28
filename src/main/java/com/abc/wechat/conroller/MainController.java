@@ -33,9 +33,16 @@ public class MainController {
     //上传新增聊天记录
     @GetMapping("/upload")
     @Scheduled(cron = "30 30 * * * *")
-    public ResultMsg ResultMsg(){
-        List<Integer> newMsgNums =  chatRecordsService.upload();
-        return responseResultMsg(200, "success", newMsgNums.get(0) + " new text messages uploaded");
+    public ResultMsg uploadToMongo(){
+        List<Integer> res =  chatRecordsService.upload();
+        return responseResultMsg(200, "success", res.get(0) + " new text messages uploaded");
+    }
+
+    //每天0:0reupload失敗的消息到Mongo
+    //@Scheduled(cron = "0 0 0 * * ? *")
+    public ResultMsg reuploadToMongo(){
+        List<Integer> res = chatRecordsService.reupload();
+        return responseResultMsg(200, "success", res.get(0) + " new text messages reuploaded");
     }
 
     //查看新增聊天记录

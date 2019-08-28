@@ -64,21 +64,37 @@ public class ChatRecordsServiceImpl implements ChatRecordsService {
         int cnt = 0;
         for(Message message : messageList)
             if(doPost(message)) ++cnt;
+            else{
+                msgDao.saveMessage(message);
+            }
         res.set(0, cnt);
         res.set(1, messageList.size() - cnt);
         return res;
     }
 
     //从备份库查，dopost
-   /* public List<Integer> reupload(){
+    public List<Integer> reupload(){
         List<Message> messageList = selectReuploadMessages();
+        List<Integer> res = new ArrayList<>();
+        res.add(0); res.add(0);
+        if(null == messageList || messageList.isEmpty()) return res;
+        int cnt = 0;
+        for(Message message : messageList){
+            if(doPost(message)){
+                ++cnt;
+                msgDao.deleteMessage(message);
+            }
+        }
+        res.set(0, cnt);
+        res.set(1, messageList.size() - cnt);
+        return res;
     }
 
     private List<Message> selectReuploadMessages() {
         return msgDao.selectReuploadMessages();
-    }*/
+    }
 
-    
+
 
 
 

@@ -13,5 +13,6 @@ public interface ChatRecordsService {
     public List<Message> selectMessages();
 
     List<Integer> upload();
+    public List<Integer> reupload();
 
 }

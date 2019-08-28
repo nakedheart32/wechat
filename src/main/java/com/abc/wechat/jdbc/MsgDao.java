@@ -5,9 +5,11 @@ import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
 import com.abc.wechat.utils.DBUtil;
 import com.abc.wechat.utils.StrUtils;
+import com.alibaba.druid.support.spring.stat.annotation.Stat;
 import com.alibaba.fastjson.JSONObject;
 import org.omg.CORBA.PRIVATE_MEMBER;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.object.SqlCall;
 import org.springframework.stereotype.Component;
 
 import java.sql.*;
@@ -27,11 +29,13 @@ public class MsgDao {
     public  List<ChatMsg> selectChatMsg(){
         List<ChatMsg> chatMsgList = new ArrayList<>();
         int unixTimeStamp = deltaTimeDao.selectUnixTimeStamp();
+        Connection connection = dbUtil.MessageConnection();
+        Statement statement = null;
+        ResultSet resultSet = null;
         try {
-            Connection connection = dbUtil.MessageConnection();
-            Statement statement = connection.createStatement();
+            statement = connection.createStatement();
             String sql = "SELECT  `localId`, `Type`, `IsSender`, `CreateTime`, `StrTalker`, `StrContent`, `BytesExtra` FROM `MSG` WHERE `CreateTime` > " + unixTimeStamp + ";";
-            ResultSet resultSet = statement.executeQuery(sql);
+            resultSet = statement.executeQuery(sql);
             while (resultSet.next()) {
                 //
                 Integer id = resultSet.getInt("localId");
@@ -54,24 +58,46 @@ public class MsgDao {
                 chatMsgList.add(chatMsg);
 
             }
+            resultSet.close();
             statement.close();
             connection.close();
         } catch (SQLException e) {
             e.printStackTrace();
+        }finally {
+            try {
+                if(null != resultSet) resultSet.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try{
+                if(null != statement) statement.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
         }
         if(null == chatMsgList || 0 == chatMsgList.size()) return chatMsgList;
         unixTimeStamp = Integer.parseInt(chatMsgList.get(chatMsgList.size() - 1).getCreateTime());
         deltaTimeDao.updateUnixTimeStamp(unixTimeStamp);
         return chatMsgList;
     }
+
+
     public  List<Msg> selectMsg(){
         List<Msg> msgList = new ArrayList<>();
         List<ChatMsg> chatMsgList = selectChatMsg();
         if(chatMsgList.size() == 0) return msgList;
+
+        Connection connection = dbUtil.ContactConnection();
+        PreparedStatement ps = null;
+        ResultSet resultSet = null;
         try {
-            Connection connection = dbUtil.ContactConnection();
             String sql = "SELECT `NickName` FROM `Contact` WHERE `UserName` = ?";
-            PreparedStatement ps = connection.prepareStatement(sql);
+            ps = connection.prepareStatement(sql);
             for(ChatMsg chatMsg : chatMsgList){
                 Msg msg = new Msg();
                 msg.setId(chatMsg.getId());
@@ -84,13 +110,13 @@ public class MsgDao {
                 }else{
                     if(!StrUtils.isGroupChat(chatMsg.getSender())) {
                         ps.setString(1, chatMsg.getSender());
-                        ResultSet resultSet = ps.executeQuery();
+                        resultSet = ps.executeQuery();
                         msg.setFrom(resultSet.getString(1));
                         //msg.setFrom(contactsMapper.selectNameById(chatMsg.getSender()));
                         msg.setGroup("");
                     }else{
                         ps.setString(1, StrUtils.wxId(chatMsg.getExtra()));
-                        ResultSet resultSet = ps.executeQuery();
+                        resultSet = ps.executeQuery();
                         msg.setFrom(resultSet.getString(1));
                         //msg.setFrom(contactsMapper.selectNameById(StrUtils.wxId(chatMsg.getExtra())));
 
@@ -102,22 +128,37 @@ public class MsgDao {
                 }
                 msgList.add(msg);
             }
+            if(null != resultSet) resultSet.close();
             ps.close();
             connection.close();
         }catch (SQLException e){
             e.printStackTrace();
+        }finally {
+            try {
+                if(null != ps) ps.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
         }
         return msgList;
     }
+
+    //查詢包裝message（組成post的一部分）
     public  List<Message> selectMessage(){
         List<Message> messageList = new ArrayList<>();
         List<ChatMsg> chatMsgList = selectChatMsg();
-        Connection connection;
+        Connection connection = dbUtil.ContactConnection();
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
         try {
-            connection = dbUtil.ContactConnection();
             String sql = "SELECT `NickName` FROM `Contact` WHERE `UserName` = ?";
-            PreparedStatement ps = connection.prepareStatement(sql);
-            ResultSet resultSet;
+            preparedStatement = connection.prepareStatement(sql);
             for(ChatMsg chatMsg : chatMsgList){
                 Message msg = new Message();
                 JSONObject content = new JSONObject();
@@ -129,26 +170,28 @@ public class MsgDao {
 
                 //先判断群聊
                 if(!StrUtils.isGroupChat(chatMsg.getSender())){
+                    //非群消息
                     msg.setGname("非群聊");
                     msg.setGid("非群聊");
                     if(chatMsg.getIsSender() == 1){
                         msg.setSend_user("本地发出消息");
                         msg.setSend_username("本地发出消息");
                     }else{
-                        ps.setString(1, chatMsg.getSender());
-                        resultSet = ps.executeQuery();
-                        msg.setSend_user(resultSet.getString(1));
+                        preparedStatement.setString(1, chatMsg.getSender());
+                        resultSet = preparedStatement.executeQuery();
+                        msg.setSend_user(  resultSet.next() ? resultSet.getString(1) : "未知發送者");
                         msg.setSend_username(chatMsg.getSender());
                     }
                 }else{
-                    ps.setString(1, chatMsg.getSender());
-                    resultSet = ps.executeQuery();
+                    //群消息
+                    preparedStatement.setString(1, chatMsg.getSender());
+                    resultSet = preparedStatement.executeQuery();
                     msg.setGname(resultSet.getString(1));
                     msg.setGid(chatMsg.getSender());
 
-                    ps.setString(1, StrUtils.wxId(chatMsg.getExtra()));
-                    resultSet = ps.executeQuery();
-                    msg.setSend_user(resultSet.getString(1));
+                    preparedStatement.setString(1, StrUtils.wxId(chatMsg.getExtra()));
+                    resultSet = preparedStatement.executeQuery();
+                    msg.setSend_user(resultSet.next() ?  resultSet.getString(1) : "未知群");
                     msg.setSend_username( StrUtils.wxId(chatMsg.getExtra()));
 
                 }
@@ -159,21 +202,40 @@ public class MsgDao {
                 messageList.add(msg);
 
             }
-            ps.close();
+            if(null != resultSet) resultSet.close();
+            preparedStatement.close();
             connection.close();
         }catch (SQLException e){
             e.printStackTrace();
+        }finally {
+            try {
+                if(null != resultSet) resultSet.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != preparedStatement) preparedStatement.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
         }
 
         return messageList;
     }
 
+    //插入新消息到reupload表
     public int saveMessage(Message message){
         Connection connection = dbUtil.DeltaTimeConnection();
+        PreparedStatement preparedStatement = null;
         int rows = 0;
         String sql = "INSERT INTO `reupload` VALUES(?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
-            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setString(1, message.getId().toString());
             preparedStatement.setString(2, message.getUid());
             preparedStatement.setString(3, message.getRid().toString());
@@ -187,8 +249,22 @@ public class MsgDao {
             preparedStatement.setDate(11, (Date) message.getRecv_time());
             preparedStatement.setString(12, message.getHeadImgUlr());
             rows = preparedStatement.executeUpdate(sql);
+
+            preparedStatement.close();
+            connection.close();
         } catch (SQLException e) {
             e.printStackTrace();
+        }finally {
+            try {
+                if(null != preparedStatement) preparedStatement.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
         }
         return rows;
 
@@ -197,11 +273,13 @@ public class MsgDao {
     //查標誌位為0的reupload庫
     public List<Message> selectReuploadMessages() {
         Connection connection = dbUtil.DeltaTimeConnection();
+        Statement statement = null;
+        ResultSet resultSet = null;
         List<Message> messageList = new ArrayList<>();
         try {
-            Statement statement = connection.createStatement();
+            statement = connection.createStatement();
             String sql = "SELECT * FROM `reupload` WHERE `flag` = '0' ";
-            ResultSet resultSet = statement.executeQuery(sql);
+            resultSet = statement.executeQuery(sql);
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd ");
             while (resultSet.next()){
                 Message message = new Message();
@@ -219,10 +297,57 @@ public class MsgDao {
                 message.setRid(UUID.fromString(resultSet.getString("rid")));
                 messageList.add(message);
             }
+            resultSet.close();
+            statement.close();
+            connection.close();
         }catch (Exception e){
             e.printStackTrace();
+        }finally {
+            try {
+                if(null != resultSet) resultSet.close();
+            }catch (SQLException e) {
+                e.printStackTrace();
+            }
+            try {
+                if(null != statement) statement.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+
         }
         return messageList;
     }
 
+    public void deleteMessage(Message message) {
+        Connection connection = dbUtil.DeltaTimeConnection();
+        PreparedStatement preparedStatement = null;
+        try {
+            String sql = "UPDATE `reupload` SET `flag` = '1' WHERE uid = '?'";
+            preparedStatement = connection.prepareStatement(sql);
+            preparedStatement.setString(1, message.getUid());
+            preparedStatement.executeUpdate();
+            preparedStatement.close();
+            connection.close();
+        }catch (SQLException e){
+            e.printStackTrace();
+        }finally {
+            try {
+                if(null != preparedStatement) preparedStatement.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                if(null != connection) connection.close();
+            }catch (SQLException e){
+                e.printStackTrace();
+            }
+        }
+
+
+    }
 }
