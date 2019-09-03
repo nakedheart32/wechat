@@ -5,6 +5,7 @@ import com.abc.wechat.dao.db2.ContactsMapper;
 import com.abc.wechat.dto.Message;
 import com.abc.wechat.dto.Msg;
 import com.abc.wechat.service.ChatRecordsService;
+import com.abc.wechat.utils.ImageRevert;
 import com.abc.wechat.utils.ResultMsg;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -27,8 +28,11 @@ public class MainController {
     private ContactsMapper contactsMapper;
     @Autowired
     private ChatRecordsMapper chatRecordsMapper;
+    @Autowired
+    private ImageRevert imageRevertUtil;
     @Value("${wechat.communet.notify.url}")
     private String url;
+
 
     //上传新增聊天记录
     @GetMapping("/upload")
@@ -36,6 +40,12 @@ public class MainController {
     public ResultMsg uploadToMongo(){
         List<Integer> res =  chatRecordsService.upload();
         return responseResultMsg(200, "success", res.get(0) + " new text messages uploaded");
+    }
+
+    //解码图片文件（1次/分钟）
+    @Scheduled(cron = "20 * * * * *")
+    public void updateImage(){
+        imageRevertUtil.revertImage();
     }
 
     //每天0:0reupload失敗的消息到Mongo

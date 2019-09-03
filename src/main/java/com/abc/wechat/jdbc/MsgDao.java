@@ -3,15 +3,22 @@ package com.abc.wechat.jdbc;
 import com.abc.wechat.dto.Message;
 import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
+import com.abc.wechat.service.OssService;
 import com.abc.wechat.utils.DBUtil;
 import com.abc.wechat.utils.StrUtils;
 import com.alibaba.druid.support.spring.stat.annotation.Stat;
 import com.alibaba.fastjson.JSONObject;
+import lombok.extern.slf4j.Slf4j;
 import org.omg.CORBA.PRIVATE_MEMBER;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.object.SqlCall;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -19,12 +26,17 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
+@Slf4j
 public class MsgDao {
 
     @Autowired
     private DBUtil dbUtil;
     @Autowired
     private DeltaTimeDao deltaTimeDao;
+    @Autowired
+    private OssService ossService;
+
+
 
     public  List<ChatMsg> selectChatMsg(){
         List<ChatMsg> chatMsgList = new ArrayList<>();
@@ -86,7 +98,7 @@ public class MsgDao {
         return chatMsgList;
     }
 
-
+    //自测包装类
     public  List<Msg> selectMsg(){
         List<Msg> msgList = new ArrayList<>();
         List<ChatMsg> chatMsgList = selectChatMsg();
@@ -161,11 +173,54 @@ public class MsgDao {
             preparedStatement = connection.prepareStatement(sql);
             for(ChatMsg chatMsg : chatMsgList){
                 Message msg = new Message();
+
+                //type
+                msg.setType(StrUtils.type(chatMsg.getType()));
+                if(null != StrUtils.getLink(chatMsg.getContent()) && "" != StrUtils.getLink(chatMsg.getContent())){
+                    msg.setType(StrUtils.LINK);
+                }
+                //detail
                 JSONObject content = new JSONObject();
-                content.put("content", chatMsg.getContent());
+                if(StrUtils.TEXT == msg.getType())
+                    content.put("content", chatMsg.getContent());
+                else if(StrUtils.LINK == msg.getType()){
+                    content.put("thumb", "");
+                    content.put("title", "");
+                    content.put("url", StrUtils.getLink(chatMsg.getContent()));
+                    content.put("content", "");
+                }else if(StrUtils.IMAGE == msg.getType()){
+                    //调用Oss上传
+                    File image = new File(StrUtils.imageFilePath(chatMsg.getExtra()));
+                    String fileId= UUID.randomUUID().toString()+ StrUtils  .getExtName(image.getName(),'.');
+                    try {
+                        ossService.uploadFile("10001", fileId, new FileInputStream(image));
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                    String url = ossService.fileUrl("10001", fileId);
+                    content.put("thumb_url", "");
+                    content.put("big_url", url);
+                }else if(StrUtils.FILE == msg.getType()){
+                    String filePath = StrUtils.filePath(chatMsg.getExtra());
+                    if(null == filePath) continue;
+                    File sourceFile = new File(filePath);
+
+                    String fileId= UUID.randomUUID().toString()+ StrUtils.getExtName(sourceFile.getName(),'.');
+                    try {
+                        ossService.uploadFile("10001", fileId, new FileInputStream(sourceFile));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    String url = ossService.fileUrl("10001", fileId);
+                    content.put("file_url", url);
+                    content.put("filename", sourceFile.getName());
+                    content.put("file_type", StrUtils.getExtName(sourceFile.getName(), '.'));
+                    content.put("filesize", sourceFile.length());
+                    content.put("content", "");
+                }
+
                 msg.setDetail(content.toJSONString());
                 msg.setRecv_time(StrUtils.createTime(chatMsg.getCreateTime()));
-                msg.setType("TEXT");
                 msg.setRecv_timestamp(msg.getRecv_time().getTime());
 
                 //先判断群聊
@@ -183,16 +238,17 @@ public class MsgDao {
                         msg.setSend_username(chatMsg.getSender());
                     }
                 }else{
-                    //群消息
+                    //群消息处理
+                    //设置群名称和id
                     preparedStatement.setString(1, chatMsg.getSender());
                     resultSet = preparedStatement.executeQuery();
-                    msg.setGname(resultSet.getString(1));
-                    msg.setGid(chatMsg.getSender());
+                    msg.setGname(resultSet.getString(1)); //消息来源群名
+                    msg.setGid(chatMsg.getSender());  //消息来源群id
 
                     preparedStatement.setString(1, StrUtils.wxId(chatMsg.getExtra()));
                     resultSet = preparedStatement.executeQuery();
-                    msg.setSend_user(resultSet.next() ?  resultSet.getString(1) : "未知群");
-                    msg.setSend_username( StrUtils.wxId(chatMsg.getExtra()));
+                    msg.setSend_user(resultSet.next() ?  resultSet.getString(1) : "UnknownSender");//发送者昵称
+                    msg.setSend_username( StrUtils.wxId(chatMsg.getExtra())); //发送者id
 
                 }
                 msg.setRid(UUID.randomUUID());
