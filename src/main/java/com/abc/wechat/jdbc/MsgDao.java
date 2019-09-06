@@ -4,16 +4,14 @@ import com.abc.wechat.dto.Message;
 import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
 import com.abc.wechat.service.OssService;
+import com.abc.wechat.utils.Constant;
 import com.abc.wechat.utils.DBUtil;
+import com.abc.wechat.utils.ImageRevert;
 import com.abc.wechat.utils.StrUtils;
-import com.alibaba.druid.support.spring.stat.annotation.Stat;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
-import org.omg.CORBA.PRIVATE_MEMBER;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.object.SqlCall;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,10 +33,15 @@ public class MsgDao {
     private DeltaTimeDao deltaTimeDao;
     @Autowired
     private OssService ossService;
-
-
+    @Autowired
+    private StrUtils strUtils;
+    @Autowired
+    private ImageRevert imageRevert;
 
     public  List<ChatMsg> selectChatMsg(){
+        //解码图片
+        imageRevert.revertImage();
+
         List<ChatMsg> chatMsgList = new ArrayList<>();
         int unixTimeStamp = deltaTimeDao.selectUnixTimeStamp();
         Connection connection = dbUtil.MessageConnection();
@@ -57,7 +60,6 @@ public class MsgDao {
                 String sender = resultSet.getString("StrTalker");
                 String content = resultSet.getString("StrContent");
                 String extra = resultSet.getString("BytesExtra");
-                //System.out.println(extra);
                 ChatMsg chatMsg = new ChatMsg();
                 chatMsg.setId(id);
                 chatMsg.setType(type);
@@ -113,9 +115,8 @@ public class MsgDao {
             for(ChatMsg chatMsg : chatMsgList){
                 Msg msg = new Msg();
                 msg.setId(chatMsg.getId());
-                //msg.setTime(StrUtils.createTime(chatMsg.getCreateTime()));
                 msg.setContent(chatMsg.getContent());
-                msg.setType(StrUtils.type(chatMsg.getType()));
+                msg.setType(Constant.type(chatMsg.getType()));
                 if(chatMsg.getIsSender() == 1) {
                     msg.setFrom("我");
                     msg.setGroup("非群聊");
@@ -124,18 +125,15 @@ public class MsgDao {
                         ps.setString(1, chatMsg.getSender());
                         resultSet = ps.executeQuery();
                         msg.setFrom(resultSet.getString(1));
-                        //msg.setFrom(contactsMapper.selectNameById(chatMsg.getSender()));
                         msg.setGroup("");
                     }else{
                         ps.setString(1, StrUtils.wxId(chatMsg.getExtra()));
                         resultSet = ps.executeQuery();
                         msg.setFrom(resultSet.getString(1));
-                        //msg.setFrom(contactsMapper.selectNameById(StrUtils.wxId(chatMsg.getExtra())));
 
                         ps.setString(1, chatMsg.getSender());
                         resultSet = ps.executeQuery();
                         msg.setGroup(resultSet.getString(1));
-                        //msg.setGroup(contactsMapper.selectNameById(chatMsg.getSender()));
                     }
                 }
                 msgList.add(msg);
@@ -173,25 +171,26 @@ public class MsgDao {
             preparedStatement = connection.prepareStatement(sql);
             for(ChatMsg chatMsg : chatMsgList){
                 Message msg = new Message();
-
                 //type
-                msg.setType(StrUtils.type(chatMsg.getType()));
-                if(null != StrUtils.getLink(chatMsg.getContent()) && "" != StrUtils.getLink(chatMsg.getContent())){
-                    msg.setType(StrUtils.LINK);
+                msg.setType(Constant.type(chatMsg.getType()));
+                if(null != strUtils.getLink(chatMsg.getContent()) && "" != strUtils.getLink(chatMsg.getContent())){
+                    msg.setType(Constant.LINK);
                 }
                 //detail
                 JSONObject content = new JSONObject();
-                if(StrUtils.TEXT == msg.getType())
+                if(Constant.TEXT == msg.getType())
                     content.put("content", chatMsg.getContent());
-                else if(StrUtils.LINK == msg.getType()){
+                else if(Constant.LINK == msg.getType()){
                     content.put("thumb", "");
                     content.put("title", "");
-                    content.put("url", StrUtils.getLink(chatMsg.getContent()));
+                    content.put("url", strUtils.getLink(chatMsg.getContent()));
                     content.put("content", "");
-                }else if(StrUtils.IMAGE == msg.getType()){
+                }else if(Constant.IMAGE == msg.getType()){
                     //调用Oss上传
-                    File image = new File(StrUtils.imageFilePath(chatMsg.getExtra()));
-                    String fileId= UUID.randomUUID().toString()+ StrUtils  .getExtName(image.getName(),'.');
+                    String imagePath = strUtils.imageFilePath(chatMsg.getExtra());
+                    if(null == imagePath || "" == imagePath) continue;
+                    File image = new File(imagePath);
+                    String fileId= UUID.randomUUID().toString()+ strUtils.getExtName(image.getName(),'.');
                     try {
                         ossService.uploadFile("10001", fileId, new FileInputStream(image));
                     } catch (FileNotFoundException e) {
@@ -200,12 +199,11 @@ public class MsgDao {
                     String url = ossService.fileUrl("10001", fileId);
                     content.put("thumb_url", "");
                     content.put("big_url", url);
-                }else if(StrUtils.FILE == msg.getType()){
-                    String filePath = StrUtils.filePath(chatMsg.getExtra());
-                    if(null == filePath) continue;
+                }else if(Constant.FILE == msg.getType()){
+                    String filePath = strUtils.filePath(chatMsg.getExtra());
+                    if(null == filePath || "" == filePath) continue;
                     File sourceFile = new File(filePath);
-
-                    String fileId= UUID.randomUUID().toString()+ StrUtils.getExtName(sourceFile.getName(),'.');
+                    String fileId= UUID.randomUUID().toString()+ strUtils.getExtName(sourceFile.getName(),'.');
                     try {
                         ossService.uploadFile("10001", fileId, new FileInputStream(sourceFile));
                     } catch (IOException e) {
@@ -214,7 +212,7 @@ public class MsgDao {
                     String url = ossService.fileUrl("10001", fileId);
                     content.put("file_url", url);
                     content.put("filename", sourceFile.getName());
-                    content.put("file_type", StrUtils.getExtName(sourceFile.getName(), '.'));
+                    content.put("file_type", strUtils.getExtName(sourceFile.getName(), '.'));
                     content.put("filesize", sourceFile.length());
                     content.put("content", "");
                 }
@@ -226,7 +224,7 @@ public class MsgDao {
                 //先判断群聊
                 if(!StrUtils.isGroupChat(chatMsg.getSender())){
                     //非群消息
-                    msg.setGname("非群聊");
+                    /*msg.setGname("非群聊");
                     msg.setGid("非群聊");
                     if(chatMsg.getIsSender() == 1){
                         msg.setSend_user("本地发出消息");
@@ -236,9 +234,10 @@ public class MsgDao {
                         resultSet = preparedStatement.executeQuery();
                         msg.setSend_user(  resultSet.next() ? resultSet.getString(1) : "未知發送者");
                         msg.setSend_username(chatMsg.getSender());
-                    }
-                }else{
-                    //群消息处理
+                    }*/
+                    continue;
+                }else if( Constant.getGroupSet().contains(chatMsg.getSender())){
+                    //处理指定群的消息
                     //设置群名称和id
                     preparedStatement.setString(1, chatMsg.getSender());
                     resultSet = preparedStatement.executeQuery();
@@ -256,7 +255,6 @@ public class MsgDao {
                 msg.setId(UUID.randomUUID());
                 msg.setUid("80114481815754212");
                 messageList.add(msg);
-
             }
             if(null != resultSet) resultSet.close();
             preparedStatement.close();

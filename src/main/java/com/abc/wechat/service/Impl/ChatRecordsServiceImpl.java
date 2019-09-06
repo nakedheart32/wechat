@@ -7,8 +7,8 @@ import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
 import com.abc.wechat.jdbc.MsgDao;
 import com.abc.wechat.service.ChatRecordsService;
+import com.abc.wechat.utils.Constant;
 import com.abc.wechat.utils.HttpClientUtil;
-import com.abc.wechat.utils.StrUtils;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -63,18 +63,12 @@ public class ChatRecordsServiceImpl implements ChatRecordsService {
         res.add(0);res.add(0);
         if(null == messageList || messageList.size() == 0) return res;
         int cnt = 0;
-        for(Message message : messageList) {
-            if(StrUtils.TEXT == message.getType()) {
-                if (doPost(message)) ++cnt;
-                else {
-                    msgDao.saveMessage(message);
-                }
-            }else if(StrUtils.IMAGE == message.getType()){
-
-            }else if(StrUtils.FILE == message.getType()){
-
+        for(Message message : messageList)
+            if(doPost(message)) ++cnt;
+            else{
+                msgDao.saveMessage(message);
             }
-        }
+
         res.set(0, cnt);
         res.set(1, messageList.size() - cnt);
         return res;
@@ -104,11 +98,6 @@ public class ChatRecordsServiceImpl implements ChatRecordsService {
 
 
 
-
-
-
-
-    //Todo :do post 加参数区分不同类型
     private boolean doPost(Message message){
         JSONObject jsonToPost = new JSONObject();
         JSONArray jsonArray = new JSONArray();

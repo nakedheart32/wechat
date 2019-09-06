@@ -43,10 +43,10 @@ public class MainController {
     }
 
     //解码图片文件（1次/分钟）
-    @Scheduled(cron = "20 * * * * *")
+    /*@Scheduled(cron = "20 * * * * *")
     public void updateImage(){
         imageRevertUtil.revertImage();
-    }
+    }*/
 
     //每天0:0reupload失敗的消息到Mongo
     //@Scheduled(cron = "0 0 0 * * ? *")
