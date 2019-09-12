@@ -1,35 +1,19 @@
 package com.abc.wechat.utils;
 
-import com.abc.wechat.dao.db2.ContactsMapper;
-import com.abc.wechat.utils.Constant;
-
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
 @Data
 public class StrUtils {
-    @Autowired
-    private ContactsMapper contactsMapper;
 
-    @Value("${image.baseTarPath}")
-    private String baseTar;
-
-    @Value("${file.pattern}")
-    private  String FILE_PATTERN;
-
-
+    private String baseTar = "F:\\\\run\\\\abc9793326235\\\\FileStorage\\\\Image\\\\";
 
     //时间戳转换
     public static Date createTime(String createTime){
@@ -92,7 +76,7 @@ public class StrUtils {
     }
 
     public String filePath(String BytesExtra){
-        Matcher m = Pattern.compile(FILE_PATTERN).matcher(BytesExtra);
+        Matcher m = Pattern.compile(Constant.FILE_PATTERN).matcher(BytesExtra);
         if(m.find()) return m.group();
         return null;
     }

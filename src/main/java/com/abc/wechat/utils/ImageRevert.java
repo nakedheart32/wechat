@@ -21,13 +21,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Data
 @Component
 public class ImageRevert {
-    static {
-        getAllFileType();
-    }
     @Value("${image.baseSrcPath}")
     private String baseSRC;
-    @Value("${image.baseTarPath}")
-    private String baseTAR;
+    private String baseTAR = "F:\\\\run\\\\abc9793326235\\\\FileStorage\\\\Image\\\\";
     private String SRC ;
     private String TAR ;
 
@@ -37,8 +33,12 @@ public class ImageRevert {
     private final static Logger logger = LoggerFactory.getLogger(ImageRevert.class);
     private final static Map<String, String> FILE_TYPE_MAP = new HashMap<String, String>();
 
+    static {
+        getAllFileType();
+    }
+
     public void revertImage(){
-        SRC = baseSRC + strUtils.thisMonth();
+        SRC = baseSRC + "\\FileStorage\\Image\\" + strUtils.thisMonth();
         TAR = baseTAR + strUtils.thisMonth();
         //检查目标文件夹是否存在，若不存在则创建文件夹
         File targetDirectory = new File(TAR);

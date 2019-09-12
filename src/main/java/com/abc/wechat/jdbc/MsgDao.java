@@ -1,7 +1,6 @@
 package com.abc.wechat.jdbc;
 
 import com.abc.wechat.dto.Message;
-import com.abc.wechat.dto.Msg;
 import com.abc.wechat.entity.ChatMsg;
 import com.abc.wechat.service.OssService;
 import com.abc.wechat.utils.Constant;
@@ -38,18 +37,27 @@ public class MsgDao {
     @Autowired
     private ImageRevert imageRevert;
 
-    public  List<ChatMsg> selectChatMsg(){
+    //查原始消息，返回ChatMsg列表
+    public List<ChatMsg> selectChatMsg(int timestamp, String groups){
+
+        String unixTimeStamp = "'" + timestamp + "'";
+        groups = groups.replace(",", "','");
+        groups = "('" + groups + "')";
+
+
         //解码图片
         imageRevert.revertImage();
 
         List<ChatMsg> chatMsgList = new ArrayList<>();
-        int unixTimeStamp = deltaTimeDao.selectUnixTimeStamp();
         Connection connection = dbUtil.MessageConnection();
         Statement statement = null;
         ResultSet resultSet = null;
         try {
             statement = connection.createStatement();
-            String sql = "SELECT  `localId`, `Type`, `IsSender`, `CreateTime`, `StrTalker`, `StrContent`, `BytesExtra` FROM `MSG` WHERE `CreateTime` > " + unixTimeStamp + ";";
+            String sql = "SELECT  `localId`, `Type`, `IsSender`, `CreateTime`, `StrTalker`, `StrContent`, `BytesExtra` FROM `MSG` WHERE `CreateTime` > "+
+                    unixTimeStamp +
+                    "AND (`Type` IN "+"(1, 3, 49)"+
+                    " AND `StrTalker` in " + groups +");";
             resultSet = statement.executeQuery(sql);
             while (resultSet.next()) {
                 //
@@ -95,180 +103,34 @@ public class MsgDao {
             }
         }
         if(null == chatMsgList || 0 == chatMsgList.size()) return chatMsgList;
-        unixTimeStamp = Integer.parseInt(chatMsgList.get(chatMsgList.size() - 1).getCreateTime());
-        deltaTimeDao.updateUnixTimeStamp(unixTimeStamp);
         return chatMsgList;
     }
 
-    //自测包装类
-    public  List<Msg> selectMsg(){
-        List<Msg> msgList = new ArrayList<>();
-        List<ChatMsg> chatMsgList = selectChatMsg();
-        if(chatMsgList.size() == 0) return msgList;
-
+    //根据wxid查昵称
+    public String selectNicknameByWxid(String wxid){
         Connection connection = dbUtil.ContactConnection();
-        PreparedStatement ps = null;
+        PreparedStatement statement = null;
         ResultSet resultSet = null;
+        String nickName = "";
         try {
             String sql = "SELECT `NickName` FROM `Contact` WHERE `UserName` = ?";
-            ps = connection.prepareStatement(sql);
-            for(ChatMsg chatMsg : chatMsgList){
-                Msg msg = new Msg();
-                msg.setId(chatMsg.getId());
-                msg.setContent(chatMsg.getContent());
-                msg.setType(Constant.type(chatMsg.getType()));
-                if(chatMsg.getIsSender() == 1) {
-                    msg.setFrom("我");
-                    msg.setGroup("非群聊");
-                }else{
-                    if(!StrUtils.isGroupChat(chatMsg.getSender())) {
-                        ps.setString(1, chatMsg.getSender());
-                        resultSet = ps.executeQuery();
-                        msg.setFrom(resultSet.getString(1));
-                        msg.setGroup("");
-                    }else{
-                        ps.setString(1, StrUtils.wxId(chatMsg.getExtra()));
-                        resultSet = ps.executeQuery();
-                        msg.setFrom(resultSet.getString(1));
-
-                        ps.setString(1, chatMsg.getSender());
-                        resultSet = ps.executeQuery();
-                        msg.setGroup(resultSet.getString(1));
-                    }
-                }
-                msgList.add(msg);
-            }
-            if(null != resultSet) resultSet.close();
-            ps.close();
+            statement = connection.prepareStatement(sql);
+            statement.setString(1, wxid);
+            resultSet = statement.executeQuery();
+            if(resultSet.next()) nickName = resultSet.getString(1);
+            resultSet.close();
+            statement.close();
             connection.close();
-        }catch (SQLException e){
-            e.printStackTrace();
-        }finally {
-            try {
-                if(null != ps) ps.close();
-            }catch (SQLException e){
-                e.printStackTrace();
-            }
-
-            try {
-                if(null != connection) connection.close();
-            }catch (SQLException e){
-                e.printStackTrace();
-            }
-        }
-        return msgList;
-    }
-
-    //查詢包裝message（組成post的一部分）
-    public  List<Message> selectMessage(){
-        List<Message> messageList = new ArrayList<>();
-        List<ChatMsg> chatMsgList = selectChatMsg();
-        Connection connection = dbUtil.ContactConnection();
-        PreparedStatement preparedStatement = null;
-        ResultSet resultSet = null;
-        try {
-            String sql = "SELECT `NickName` FROM `Contact` WHERE `UserName` = ?";
-            preparedStatement = connection.prepareStatement(sql);
-            for(ChatMsg chatMsg : chatMsgList){
-                Message msg = new Message();
-                //type
-                msg.setType(Constant.type(chatMsg.getType()));
-                if(null != strUtils.getLink(chatMsg.getContent()) && "" != strUtils.getLink(chatMsg.getContent())){
-                    msg.setType(Constant.LINK);
-                }
-                //detail
-                JSONObject content = new JSONObject();
-                if(Constant.TEXT == msg.getType())
-                    content.put("content", chatMsg.getContent());
-                else if(Constant.LINK == msg.getType()){
-                    content.put("thumb", "");
-                    content.put("title", "");
-                    content.put("url", strUtils.getLink(chatMsg.getContent()));
-                    content.put("content", "");
-                }else if(Constant.IMAGE == msg.getType()){
-                    //调用Oss上传
-                    String imagePath = strUtils.imageFilePath(chatMsg.getExtra());
-                    if(null == imagePath || "" == imagePath) continue;
-                    File image = new File(imagePath);
-                    String fileId= UUID.randomUUID().toString()+ strUtils.getExtName(image.getName(),'.');
-                    try {
-                        ossService.uploadFile("10001", fileId, new FileInputStream(image));
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                    String url = ossService.fileUrl("10001", fileId);
-                    content.put("thumb_url", "");
-                    content.put("big_url", url);
-                }else if(Constant.FILE == msg.getType()){
-                    String filePath = strUtils.filePath(chatMsg.getExtra());
-                    if(null == filePath || "" == filePath) continue;
-                    File sourceFile = new File(filePath);
-                    String fileId= UUID.randomUUID().toString()+ strUtils.getExtName(sourceFile.getName(),'.');
-                    try {
-                        ossService.uploadFile("10001", fileId, new FileInputStream(sourceFile));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    String url = ossService.fileUrl("10001", fileId);
-                    content.put("file_url", url);
-                    content.put("filename", sourceFile.getName());
-                    content.put("file_type", strUtils.getExtName(sourceFile.getName(), '.'));
-                    content.put("filesize", sourceFile.length());
-                    content.put("content", "");
-                }
-
-                msg.setDetail(content.toJSONString());
-                msg.setRecv_time(StrUtils.createTime(chatMsg.getCreateTime()));
-                msg.setRecv_timestamp(msg.getRecv_time().getTime());
-
-                //先判断群聊
-                if(!StrUtils.isGroupChat(chatMsg.getSender())){
-                    //非群消息
-                    /*msg.setGname("非群聊");
-                    msg.setGid("非群聊");
-                    if(chatMsg.getIsSender() == 1){
-                        msg.setSend_user("本地发出消息");
-                        msg.setSend_username("本地发出消息");
-                    }else{
-                        preparedStatement.setString(1, chatMsg.getSender());
-                        resultSet = preparedStatement.executeQuery();
-                        msg.setSend_user(  resultSet.next() ? resultSet.getString(1) : "未知發送者");
-                        msg.setSend_username(chatMsg.getSender());
-                    }*/
-                    continue;
-                }else if( Constant.getGroupSet().contains(chatMsg.getSender())){
-                    //处理指定群的消息
-                    //设置群名称和id
-                    preparedStatement.setString(1, chatMsg.getSender());
-                    resultSet = preparedStatement.executeQuery();
-                    msg.setGname(resultSet.getString(1)); //消息来源群名
-                    msg.setGid(chatMsg.getSender());  //消息来源群id
-
-                    preparedStatement.setString(1, StrUtils.wxId(chatMsg.getExtra()));
-                    resultSet = preparedStatement.executeQuery();
-                    msg.setSend_user(resultSet.next() ?  resultSet.getString(1) : "UnknownSender");//发送者昵称
-                    msg.setSend_username( StrUtils.wxId(chatMsg.getExtra())); //发送者id
-
-                }
-                msg.setRid(UUID.randomUUID());
-                msg.setHeadImgUlr("");
-                msg.setId(UUID.randomUUID());
-                msg.setUid("80114481815754212");
-                messageList.add(msg);
-            }
-            if(null != resultSet) resultSet.close();
-            preparedStatement.close();
-            connection.close();
-        }catch (SQLException e){
+        }catch (Exception e){
             e.printStackTrace();
         }finally {
             try {
                 if(null != resultSet) resultSet.close();
-            }catch (SQLException e){
+            }catch (SQLException e) {
                 e.printStackTrace();
             }
             try {
-                if(null != preparedStatement) preparedStatement.close();
+                if(null != statement) statement.close();
             }catch (SQLException e){
                 e.printStackTrace();
             }
@@ -278,16 +140,17 @@ public class MsgDao {
                 e.printStackTrace();
             }
         }
-
-        return messageList;
+        return nickName;
     }
+
+
 
     //插入新消息到reupload表
     public int saveMessage(Message message){
         Connection connection = dbUtil.DeltaTimeConnection();
         PreparedStatement preparedStatement = null;
         int rows = 0;
-        String sql = "INSERT INTO `reupload` VALUES(?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO `reupload` VALUES(?, ?, ? , ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
             preparedStatement = connection.prepareStatement(sql);
             preparedStatement.setString(1, message.getId().toString());
@@ -300,9 +163,10 @@ public class MsgDao {
             preparedStatement.setLong (8, message.getRecv_timestamp());
             preparedStatement.setString(9, message.getDetail());
             preparedStatement.setString(10, message.getType());
-            preparedStatement.setDate(11, (Date) message.getRecv_time());
+            preparedStatement.setString(11, message.getRecv_time().toString());
             preparedStatement.setString(12, message.getHeadImgUlr());
-            rows = preparedStatement.executeUpdate(sql);
+            preparedStatement.setInt(13, 0);
+            rows = preparedStatement.executeUpdate();
 
             preparedStatement.close();
             connection.close();
@@ -324,7 +188,7 @@ public class MsgDao {
 
     }
 
-    //查標誌位為0的reupload庫
+    //查標誌位為0的reupload表
     public List<Message> selectReuploadMessages() {
         Connection connection = dbUtil.DeltaTimeConnection();
         Statement statement = null;
@@ -377,6 +241,7 @@ public class MsgDao {
         return messageList;
     }
 
+    //删除成功补传后的记录
     public void deleteMessage(Message message) {
         Connection connection = dbUtil.DeltaTimeConnection();
         PreparedStatement preparedStatement = null;

@@ -27,10 +27,10 @@ public class LogAspect {
 
     @AfterReturning(value = "uploadLog()", returning = "res")
     public void doAfterReturning(Object res){
-        if(null == res) {logger.info("----->没有更多新消息");};
+        if(null == res) {logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>没有更多新消息>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");};
         List<Integer>list =  (List<Integer>)res;
         long endTime = System.currentTimeMillis();
-        logger.info("成功上传消息{}条, 失败{}条, 耗时{}ms",list.get(0), list.get(1), endTime - startTime.get());
+        logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>成功上传消息{}条, 失败{}条, 耗时{}ms>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>",list.get(0), list.get(1), endTime - startTime.get());
     }
 
 }
