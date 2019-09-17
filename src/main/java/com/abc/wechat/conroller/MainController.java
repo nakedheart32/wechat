@@ -24,7 +24,7 @@ public class MainController {
 
     //上传新增聊天记录
     @GetMapping("/upload")
-    @Scheduled(cron = "30 * * * * *")
+    //@Scheduled(cron = "30 16 * * * *")
     public ResultMsg uploadToMongo(){
         List<Integer> res =  chatRecordsService.upload();
         return responseResultMsg(200, "success", res.get(0) + " new text messages uploaded");

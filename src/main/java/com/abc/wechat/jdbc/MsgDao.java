@@ -38,7 +38,7 @@ public class MsgDao {
     private ImageRevert imageRevert;
 
     //查原始消息，返回ChatMsg列表
-    public List<ChatMsg> selectChatMsg(int timestamp, String groups){
+    public List<ChatMsg> selectChatMsg(Long timestamp, String groups){
 
         String unixTimeStamp = "'" + timestamp + "'";
         groups = groups.replace(",", "','");
@@ -58,6 +58,7 @@ public class MsgDao {
                     unixTimeStamp +
                     "AND (`Type` IN "+"(1, 3, 49)"+
                     " AND `StrTalker` in " + groups +");";
+            System.out.println(sql);
             resultSet = statement.executeQuery(sql);
             while (resultSet.next()) {
                 //

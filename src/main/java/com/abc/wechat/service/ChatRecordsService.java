@@ -6,8 +6,7 @@ import java.util.List;
 
 public interface ChatRecordsService {
 
-    List<Message> selectMessages();
-
+    //List<Message> selectMessages();
     List<Integer> upload();
     List<Integer> reupload();
 

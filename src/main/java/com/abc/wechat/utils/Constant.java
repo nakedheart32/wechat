@@ -1,7 +1,11 @@
 package com.abc.wechat.utils;
 
+import com.abc.wechat.jdbc.ContactDao;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
 
 @Component
 public class Constant {
@@ -19,10 +23,18 @@ public class Constant {
     public static final String FILE = "FILE";
 
     private static String groups;
+    private static Map<String, String> contactMap;
+
+    private static ContactDao contactDao;
+    @Autowired
+    public void setContactDao(ContactDao cDao){
+        contactDao = cDao;
+    }
+
+
 
     @Value("${groupList}")
     public  void setGroups(String groupStr) {
-        System.out.println(groupStr);
         groups = groupStr;
     }
     public static String getGroups() {
@@ -45,5 +57,23 @@ public class Constant {
                 type_ = "Unknown";
         }
         return type_;
+    }
+
+
+    /**
+     * @param wxid 微信id
+     * @return 微信昵称/群聊名称。返回昵称/null
+     */
+    public static String getNameByWxid(String wxid){
+        if(null == contactMap){
+            contactMap = contactDao.selectContacts();
+        }
+        if(contactMap.containsKey(wxid)) return contactMap.get(wxid);
+        else updateContactMap();
+        return contactMap.get(wxid);
+    }
+
+    public static void updateContactMap(){
+        contactMap = contactDao.selectContacts();
     }
 }

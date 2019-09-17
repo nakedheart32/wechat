@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 @Data
 public class StrUtils {
 
-    private String baseTar = "F:\\\\run\\\\abc9793326235\\\\FileStorage\\\\Image\\\\";
+    private String baseTar = "F:\\run\\abc9793326235\\FileStorage\\Image\\";
 
     //时间戳转换
     public static Date createTime(String createTime){
@@ -59,13 +59,17 @@ public class StrUtils {
 
 
     //取解码后的图片地址。若没有返回空串""
-    public String imageFilePath(String BytesExtra){
+    public String imageFilePath(String BytesExtra, int index){
         Matcher m = Pattern.compile(Constant.IMAGE_PATTERN).matcher(BytesExtra);
         String imagePath = "";
         if(m.find()) {
             imagePath = m.group();
             imagePath = imagePath.substring(6, imagePath.length() - 4) + ".jpg";
-        }else return null;
+        }else return imagePath;
+        if(index == 1 && m.find()) {
+            imagePath = m.group();
+            imagePath = imagePath.substring(6, imagePath.length() - 4) + ".jpg";
+        }
         return baseTar + imagePath;
     }
 

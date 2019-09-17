@@ -59,8 +59,7 @@ public class ImageRevert {
             return;
         }
         int size = file.length;
-        //System.out.println("总共" + size + "个文件");
-        logger.info("总共{}个文件", size);
+        logger.info("待解析图片，共{}", size);
         AtomicReference<Integer> integer = new AtomicReference<>(0);
         AtomicInteger x = new AtomicInteger();
         for (File file1 : file) {
@@ -104,16 +103,12 @@ public class ImageRevert {
                     writer.flush();
                 }
                 integer.set(integer.get() + 1);
-                /*System.out.println(file1.getName() + "(大小:" + ((double) file1.length() / 1000) + "kb,异或值:" + xor[1] + ")," +
-                        "进度：" + integer.get() +
-                        "/" + size);*/
-                logger.info("{}(大小：{}kb，异或值：{} )，进度：{}/{}", file1.getName(), ((double) file1.length() / 1000), xor[1], integer.get(), size);
+                //logger.info("{}(大小：{}kb，异或值：{} )，进度：{}/{}", file1.getName(), ((double) file1.length() / 1000), xor[1], integer.get(), size);
             } catch (Exception e) {
                 e.printStackTrace();
             }
         });
-        //System.out.println("解析完毕！");
-        logger.info("解析完毕！");
+        logger.info("图片解析完成");
     }
 
     /**
